@@ -18,6 +18,7 @@ cli/tmp/
 
 # Coolify
 deploy/coolify/.env.local
+*.env.local
 
 # Scratch/seed scripts (but not scripts/ dir)
 check-*.mjs
