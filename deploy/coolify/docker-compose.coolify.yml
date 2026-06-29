@@ -1,0 +1,47 @@
+# Paperclip Docker Compose for Coolify
+# Reference only — Coolify uses its own Docker deployment from the repo Dockerfile
+# This file is for local testing or if you prefer compose-based deploy
+
+services:
+  paperclip:
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    ports:
+      - "3100:3100"
+    environment:
+      - HOST=0.0.0.0
+      - PORT=3100
+      - PAPERCLIP_HOME=/paperclip
+      - PAPERCLIP_DEPLOYMENT_MODE=authenticated
+      - PAPERCLIP_DEPLOYMENT_EXPOSURE=public
+      - PAPERCLIP_PUBLIC_URL=${PAPERCLIP_PUBLIC_URL}
+      - PAPERCLIP_AUTH_PUBLIC_BASE_URL=${PAPERCLIP_AUTH_PUBLIC_BASE_URL}
+      - PAPERCLIP_AUTH_BASE_URL_MODE=explicit
+      - PAPERCLIP_ALLOWED_HOSTNAMES=${PAPERCLIP_ALLOWED_HOSTNAMES}
+      - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET}
+      - DATABASE_URL=${DATABASE_URL}
+      - PAPERCLIP_STORAGE_PROVIDER=s3
+      - PAPERCLIP_STORAGE_S3_BUCKET=${PAPERCLIP_STORAGE_S3_BUCKET}
+      - PAPERCLIP_STORAGE_S3_REGION=${PAPERCLIP_STORAGE_S3_REGION}
+      - PAPERCLIP_STORAGE_S3_ENDPOINT=${PAPERCLIP_STORAGE_S3_ENDPOINT}
+      - PAPERCLIP_STORAGE_S3_FORCE_PATH_STYLE=true
+      - PAPERCLIP_STORAGE_S3_PREFIX=prod/
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - PAPERCLIP_SECRETS_STRICT_MODE=true
+      - PAPERCLIP_ENABLE_COMPANY_DELETION=false
+      - HEARTBEAT_SCHEDULER_ENABLED=true
+      - PAPERCLIP_TELEMETRY_DISABLED=1
+    volumes:
+      - paperclip-data:/paperclip
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3100/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+volumes:
+  paperclip-data:
