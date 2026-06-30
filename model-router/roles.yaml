@@ -1,0 +1,24 @@
+# Logical model roles for the Paperclip Model Router.
+#
+# Each role maps a logical name (the "model type" you request from a client like
+# OpenCode) to a concrete OpenRouter model ID. Retune these freely — any
+# OpenAI-compatible client that addresses a role by name picks up the change
+# without reconfiguration.
+#
+# Override a single role at runtime without editing this file:
+#   MODEL_ROLE_THINKING=anthropic/claude-opus-4
+#   MODEL_ROLE_FAST=anthropic/claude-sonnet-4
+#   MODEL_ROLE_CHEAP=google/gemini-2.0-flash-001
+#
+# Shorthand (name: model) and expanded (name: {model, description}) both work.
+
+roles:
+  thinking:
+    model: anthropic/claude-opus-4
+    description: Deep reasoning / planning model for hard, high-stakes work.
+  fast:
+    model: anthropic/claude-sonnet-4
+    description: Balanced coding model for everyday development.
+  cheap:
+    model: deepseek/deepseek-chat
+    description: Low-cost model for high-volume, low-stakes calls.
