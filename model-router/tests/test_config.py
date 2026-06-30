@@ -51,6 +51,9 @@ def test_env_underscore_aliases_hyphen_role(tmp_path, monkeypatch):
     s = load_settings()
 
     assert s.resolve("ultra-thinking") == "deepseek/deepseek-r1"
+    # The underscore form must not leak as a second role.
+    assert "ultra_thinking" not in s.roles
+    assert s.is_role("ultra_thinking") is False
 
 
 def test_defaults_when_no_file(monkeypatch):

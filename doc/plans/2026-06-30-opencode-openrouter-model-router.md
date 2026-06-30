@@ -286,4 +286,3 @@ Example `adapterConfig` for an `opencode_local` agent using the router:
 > router's `roles.yaml`; surfacing the same roles as adapter `modelProfiles`
 > (so the Paperclip budget UI shows `coding` / `thinking` / `research` lanes) is
 > a small, separate follow-up in `packages/adapters/opencode-local/src/index.ts`.
-```

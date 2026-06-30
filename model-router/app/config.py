@@ -126,14 +126,17 @@ def load_settings() -> Settings:
     roles, descriptions = _load_roles_file(roles_path)
 
     # Per-role env overrides, e.g. MODEL_ROLE_CODING=qwen/qwen3-coder.
-    # Shell env names can't contain hyphens, so also register an underscore ->
-    # hyphen alias: MODEL_ROLE_ULTRA_THINKING overrides the "ultra-thinking" role.
+    # Shell env names can't contain hyphens, so an underscore name overrides an
+    # existing hyphenated role: MODEL_ROLE_ULTRA_THINKING -> "ultra-thinking".
+    # We only rewrite to the hyphen form when that role already exists, so we
+    # don't leak a second "ultra_thinking" role into /v1/models and /healthz.
     for key, value in os.environ.items():
-        if key.startswith(_ENV_ROLE_PREFIX) and value.strip():
-            role_name = key[len(_ENV_ROLE_PREFIX) :].lower()
-            roles[role_name] = value.strip()
-            if "_" in role_name:
-                roles[role_name.replace("_", "-")] = value.strip()
+        if not (key.startswith(_ENV_ROLE_PREFIX) and value.strip()):
+            continue
+        literal = key[len(_ENV_ROLE_PREFIX) :].lower()
+        hyphenated = literal.replace("_", "-")
+        target = hyphenated if (hyphenated != literal and hyphenated in roles) else literal
+        roles[target] = value.strip()
 
     api_keys = {
         k.strip()
