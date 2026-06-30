@@ -10,7 +10,8 @@
 Use **OpenCode** as a coding agent for building Paperclip ("PC"), driven by
 **OpenRouter** models, addressed by **role** rather than by a hard-coded model
 ID. A small **FastAPI router** sits between OpenCode and OpenRouter and maps
-logical roles — `thinking`, `fast`, `cheap` — to concrete OpenRouter models.
+logical roles — `fast`, `coding`, `thinking`, `ultra-thinking`, `research`,
+`cheap` — to concrete OpenRouter models (open-source-forward by default).
 
 You ask for a *model type*; the router decides *which model* serves it. Retune
 the mapping in one place and every client follows, with no agent reconfig.
@@ -22,13 +23,13 @@ the mapping in one place and every client follows, with no agent reconfig.
   a "code agent" you point at your own gateway.
 - **OpenRouter** gives one API key and one OpenAI-compatible surface across many
   model vendors (Anthropic, OpenAI, DeepSeek, Google, …).
-- A **role router** decouples *intent* ("I want the thinking model") from
-  *selection* ("…which today is `anthropic/claude-opus-4`"). You change the
-  backing model centrally; agents, scripts, and teammates keep using `thinking`.
+- A **role router** decouples *intent* ("I want the coding model") from
+  *selection* ("…which today is `qwen/qwen3-coder`"). You change the backing
+  model centrally; agents, scripts, and teammates keep using `coding`.
 
 ```
-┌──────────┐   model:"thinking"   ┌──────────────────────┐  model:"anthropic/   ┌────────────┐
-│ OpenCode │ ───────────────────▶ │ Paperclip Model      │  claude-opus-4"      │ OpenRouter │ ─▶ model
+┌──────────┐   model:"coding"     ┌──────────────────────┐  model:"qwen/        ┌────────────┐
+│ OpenCode │ ───────────────────▶ │ Paperclip Model      │  qwen3-coder"        │ OpenRouter │ ─▶ model
 │ (agent)  │   OpenAI /v1 schema  │ Router (FastAPI)     │ ───────────────────▶ │            │
 └──────────┘                      │ role → upstream model│   OpenAI /v1 schema  └────────────┘
                                   └──────────────────────┘
@@ -45,7 +46,7 @@ model-router/
     config.py      # role → model resolution (roles.yaml + MODEL_ROLE_* env overrides)
     upstream.py    # OpenRouter HTTP client + headers
     main.py        # FastAPI app: /healthz, /v1/models, /v1/chat/completions, /v1/completions
-  roles.yaml       # default role map (thinking / fast / cheap)
+  roles.yaml       # default role map (fast / coding / thinking / ultra-thinking / research / cheap)
   tests/           # pytest: role resolution, passthrough, auth, model listing
   requirements.txt requirements-dev.txt
   Dockerfile  .dockerignore  .env.example  README.md
@@ -66,16 +67,24 @@ Behavior:
 - **Optional auth.** Set `ROUTER_API_KEYS` to require a client bearer token;
   leave it empty for localhost-only use.
 
-Default role map (all overridable — see "Tuning the roles"):
+Default role map (all overridable — see "Tuning the roles"). The set is
+open-source-forward: coding, thinking, and cheap lanes default to open-weight
+models, with proprietary models reserved for the everyday and top-tier lanes.
 
-| Role       | Default upstream model        | Use for                                  |
-| ---------- | ----------------------------- | ---------------------------------------- |
-| `thinking` | `anthropic/claude-opus-4`     | hard reasoning, architecture, planning   |
-| `fast`     | `anthropic/claude-sonnet-4`   | everyday coding (the default)            |
-| `cheap`    | `deepseek/deepseek-chat`      | high-volume, low-stakes calls            |
+| Role             | Default upstream model        | Open weights? | Use for                                   |
+| ---------------- | ----------------------------- | :-----------: | ----------------------------------------- |
+| `fast`           | `anthropic/claude-sonnet-4`   |       —       | everyday coding (the default role)        |
+| `coding`         | `qwen/qwen3-coder`            |       ✅       | code generation / edits                   |
+| `thinking`       | `deepseek/deepseek-r1`        |       ✅       | step-by-step reasoning / planning         |
+| `ultra-thinking` | `anthropic/claude-opus-4`     |       —       | the hardest architecture / debugging work |
+| `research`       | `google/gemini-2.5-pro`       |       —       | long-context research / reading codebases |
+| `cheap`          | `deepseek/deepseek-chat`      |       ✅       | high-volume, low-stakes calls             |
 
-> These IDs are reasonable starting points, not a recommendation to lock in.
-> Pick exact models/prices from <https://openrouter.ai/models>.
+> These IDs are reasonable starting points, **not** a recommendation to lock in,
+> and model IDs drift (dated `-0324` / `-2507` suffixes, renames). Confirm exact
+> IDs/prices at <https://openrouter.ai/models>. `roles.yaml` also lists swap-in
+> alternates (e.g. `qwen/qwen-2.5-coder-32b-instruct`, `qwen/qwen3-235b-a22b`,
+> `meta-llama/llama-3.3-70b-instruct`, `google/gemini-2.0-flash-001`).
 
 ## Setup guide
 
@@ -124,22 +133,34 @@ Edit [`model-router/roles.yaml`](../../model-router/roles.yaml):
 
 ```yaml
 roles:
-  thinking:
-    model: anthropic/claude-opus-4
-    description: Deep reasoning / planning model.
   fast:
     model: anthropic/claude-sonnet-4
-    description: Everyday coding.
+    description: Everyday coding (default).
+  coding:
+    model: qwen/qwen3-coder
+    description: Open-weight Qwen3 Coder for code generation / edits.
+  thinking:
+    model: deepseek/deepseek-r1
+    description: Open-weight DeepSeek-R1 reasoning / planning.
+  ultra-thinking:
+    model: anthropic/claude-opus-4
+    description: Top-tier reasoning for the hardest work.
+  research:
+    model: google/gemini-2.5-pro
+    description: Long-context research / synthesis.
   cheap:
     model: deepseek/deepseek-chat
     description: High-volume, low-stakes calls.
 ```
 
-Or override one role without editing the file (handy in Docker/systemd):
+Or override one role without editing the file (handy in Docker/systemd). Note
+shell env names can't contain hyphens, so `ultra-thinking` uses the underscore
+form, which the router aliases back to the hyphenated role:
 
 ```bash
-MODEL_ROLE_THINKING=anthropic/claude-opus-4
-MODEL_ROLE_CHEAP=google/gemini-2.0-flash-001
+MODEL_ROLE_CODING=qwen/qwen3-coder
+MODEL_ROLE_RESEARCH=google/gemini-2.5-pro
+MODEL_ROLE_ULTRA_THINKING=anthropic/claude-opus-4   # -> ultra-thinking
 ```
 
 Add as many roles as you like (`review`, `bulk`, `vision`, …) — they appear in
@@ -172,9 +193,12 @@ provider whose `baseURL` is the router and whose model IDs are the role names:
         "apiKey": "{env:ROUTER_API_KEY}"
       },
       "models": {
-        "thinking": { "name": "Thinking (Opus via OpenRouter)" },
-        "fast":     { "name": "Fast (Sonnet via OpenRouter)" },
-        "cheap":    { "name": "Cheap (DeepSeek via OpenRouter)" }
+        "fast":           { "name": "Fast (Sonnet)" },
+        "coding":         { "name": "Coding (Qwen3 Coder)" },
+        "thinking":       { "name": "Thinking (DeepSeek-R1)" },
+        "ultra-thinking": { "name": "Ultra-thinking (Opus)" },
+        "research":       { "name": "Research (Gemini 2.5 Pro)" },
+        "cheap":          { "name": "Cheap (DeepSeek V3)" }
       }
     }
   },
@@ -185,7 +209,8 @@ provider whose `baseURL` is the router and whose model IDs are the role names:
 - `apiKey` is only consulted if you set `ROUTER_API_KEYS` on the router. For
   localhost with no router auth, any non-empty placeholder works.
 - The `"model"` line sets OpenCode's default; switch interactively with the
-  model picker and choose `paperclip-router/thinking` or `/cheap` as needed.
+  model picker and choose `paperclip-router/coding`, `/thinking`,
+  `/ultra-thinking`, `/research`, or `/cheap` as needed.
 
 > The provider/`npm`/`options` schema above follows OpenCode's documented
 > custom-provider format. OpenCode's config evolves — confirm the current schema
@@ -208,7 +233,7 @@ Drive a task on the cheap model, escalate to thinking for design work, e.g.
 - [ ] A `model:"fast"` chat call returns a completion (router → OpenRouter OK).
 - [ ] OpenCode lists `paperclip-router/*` models and completes a prompt.
 - [ ] OpenRouter dashboard shows the requests under your key.
-- [ ] `python -m pytest -q` passes in `model-router/` (10 tests).
+- [ ] `python -m pytest -q` passes in `model-router/` (11 tests).
 
 ## Security & ops notes
 
@@ -222,21 +247,43 @@ Drive a task on the cheap model, escalate to thinking for design work, e.g.
 - **Run as a service.** On the file server, wrap `uvicorn` in systemd (or run
   the Docker container with `--restart unless-stopped`) so it survives reboots.
 
-## Optional follow-up: a first-class Paperclip OpenCode adapter
+## Running OpenCode as a managed Paperclip employee
 
-The router lets OpenCode run as a standalone coding tool today. To make OpenCode
-a *managed Paperclip employee* (heartbeats, tasks, cost tracking, the org
-chart), add an adapter package following the existing `codex-local` pattern:
+Paperclip already ships a first-class `opencode_local` adapter
+(`packages/adapters/opencode-local/`, registered in the server/UI/CLI
+registries), so OpenCode can run as a managed employee (heartbeats, tasks, cost
+tracking, the org chart) without writing a new adapter.
 
-- `packages/adapters/opencode-local/` implementing the `ServerAdapterModule`,
-  `UIAdapterModule`, and `CLIAdapterModule` interfaces (see the
-  `create-agent-adapter` skill in `.agents/skills/`).
-- `execute.ts` spawns the `opencode` CLI in non-interactive mode, injects the
-  Paperclip runtime env (`PAPERCLIP_API_URL`, `PAPERCLIP_API_KEY`,
-  `PAPERCLIP_RUN_ID`), and parses stdout into `TranscriptEntry` objects.
-- Set the adapter's model config to a `paperclip-router/<role>` provider so
-  employees inherit the same role abstraction.
+The adapter runs `opencode run --format json` and takes a required `model` in
+OpenCode `provider/model` format. Two ways to feed it our roles:
 
-That is a larger effort and intentionally out of scope for this branch, which
-delivers the router + integration path. Flagging it as the natural next step.
+1. **Through this router (recommended for the role abstraction).** Add the
+   `paperclip-router` custom provider to OpenCode's config (Step 4) and set the
+   agent's `adapterConfig.model` to `paperclip-router/coding` (or any role).
+   Retuning a role then changes behavior for every employee at once.
+
+2. **Through OpenCode's built-in `openrouter` provider (no router hop).** Set
+   `adapterConfig.model` directly to e.g. `openrouter/qwen/qwen3-coder` and
+   provide `OPENROUTER_API_KEY` in the agent's env. Simpler, but you lose the
+   central role indirection.
+
+Example `adapterConfig` for an `opencode_local` agent using the router:
+
+```json
+{
+  "name": "PC Builder (OpenCode)",
+  "adapterType": "opencode_local",
+  "adapterConfig": {
+    "model": "paperclip-router/coding",
+    "dangerouslySkipPermissions": true,
+    "env": { "ROUTER_API_KEY": "<router key if ROUTER_API_KEYS is set>" }
+  }
+}
+```
+
+> The adapter's built-in `models` list and `cheap` model profile currently
+> default to OpenAI/Codex IDs. The role variety in this plan lives in the
+> router's `roles.yaml`; surfacing the same roles as adapter `modelProfiles`
+> (so the Paperclip budget UI shows `coding` / `thinking` / `research` lanes) is
+> a small, separate follow-up in `packages/adapters/opencode-local/src/index.ts`.
 ```

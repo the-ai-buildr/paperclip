@@ -6,19 +6,49 @@
 # without reconfiguration.
 #
 # Override a single role at runtime without editing this file:
-#   MODEL_ROLE_THINKING=anthropic/claude-opus-4
-#   MODEL_ROLE_FAST=anthropic/claude-sonnet-4
-#   MODEL_ROLE_CHEAP=google/gemini-2.0-flash-001
+#   MODEL_ROLE_CODING=qwen/qwen3-coder
+#   MODEL_ROLE_RESEARCH=google/gemini-2.5-pro
+#   MODEL_ROLE_THINKING=deepseek/deepseek-r1
 #
 # Shorthand (name: model) and expanded (name: {model, description}) both work.
+#
+# NOTE: model IDs below are sensible, open-source-forward defaults but should be
+# confirmed against the live catalog at https://openrouter.ai/models — vendors
+# rename and version model IDs over time (e.g. dated `-0324` / `-2507` suffixes).
 
 roles:
-  thinking:
-    model: anthropic/claude-opus-4
-    description: Deep reasoning / planning model for hard, high-stakes work.
+  # --- Everyday lane -------------------------------------------------------
   fast:
     model: anthropic/claude-sonnet-4
-    description: Balanced coding model for everyday development.
+    description: Balanced, low-latency coding model for everyday development (default).
+
+  # --- Coding lane (open source) ------------------------------------------
+  coding:
+    model: qwen/qwen3-coder
+    description: Open-weight Qwen3 Coder, tuned for code generation and edits.
+
+  # --- Reasoning lanes -----------------------------------------------------
+  thinking:
+    model: deepseek/deepseek-r1
+    description: Open-weight DeepSeek-R1 for step-by-step reasoning and planning.
+  ultra-thinking:
+    model: anthropic/claude-opus-4
+    description: Top-tier reasoning for the hardest architecture / debugging work.
+
+  # --- Research lane -------------------------------------------------------
+  research:
+    model: google/gemini-2.5-pro
+    description: Long-context research, synthesis, and reading large codebases/docs.
+
+  # --- Cheap / high-volume lane (open source) -----------------------------
   cheap:
     model: deepseek/deepseek-chat
-    description: Low-cost model for high-volume, low-stakes calls.
+    description: Low-cost DeepSeek-V3 chat for high-volume, low-stakes calls.
+
+# --- Alternates you can swap in (uncomment / override) ----------------------
+#   coding         -> qwen/qwen-2.5-coder-32b-instruct
+#   coding         -> mistralai/codestral-2501
+#   thinking       -> qwen/qwen3-235b-a22b
+#   research       -> google/gemini-2.0-flash-001        # faster / cheaper research
+#   ultra-thinking -> deepseek/deepseek-r1               # all-open-source stack
+#   fast           -> meta-llama/llama-3.3-70b-instruct  # open-source everyday lane
