@@ -4,20 +4,20 @@ A small **FastAPI** service that sits in front of [OpenRouter](https://openroute
 and exposes your models by **role** (a logical "model type") instead of by a
 hard-coded model ID.
 
-Request `thinking`, `fast`, or `cheap` — the router rewrites that to whatever
-OpenRouter model you've mapped the role to and forwards the call. It speaks the
+Request `coding`, `thinking`, `research` (and more) — the router rewrites that
+to whatever OpenRouter model you've mapped the role to and forwards the call. It speaks the
 **OpenAI Chat Completions API**, so any OpenAI-compatible client (OpenCode, the
 OpenAI SDKs, `curl`) can use it unchanged.
 
 ```
 OpenCode (or any OpenAI client)
-        │  POST /v1/chat/completions  { "model": "thinking", ... }
+        │  POST /v1/chat/completions  { "model": "coding", ... }
         ▼
 ┌─────────────────────────┐   resolve role → upstream model
-│  Paperclip Model Router  │   thinking → anthropic/claude-opus-4
-│  (FastAPI, this service) │   fast     → anthropic/claude-sonnet-4
-└─────────────────────────┘   cheap    → deepseek/deepseek-chat
-        │  POST /chat/completions  { "model": "anthropic/claude-opus-4", ... }
+│  Paperclip Model Router  │   coding   → qwen/qwen3-coder
+│  (FastAPI, this service) │   thinking → deepseek/deepseek-r1
+└─────────────────────────┘   research → google/gemini-2.5-pro   (…and more)
+        │  POST /chat/completions  { "model": "qwen/qwen3-coder", ... }
         ▼
    OpenRouter  ──►  the actual model
 ```
@@ -87,24 +87,41 @@ All config is environment-driven (see [`.env.example`](.env.example)):
 | `OPENROUTER_X_TITLE`      | `Paperclip Model Router`       | Optional OpenRouter attribution header.                           |
 | `REQUEST_TIMEOUT_SECONDS` | `600`                          | Upstream request timeout.                                         |
 
+### Roles shipped by default
+
+| Role             | Default upstream model        | Open weights? | Use for                                   |
+| ---------------- | ----------------------------- | :-----------: | ----------------------------------------- |
+| `fast`           | `anthropic/claude-sonnet-4`   |       —       | everyday coding (the default role)        |
+| `coding`         | `qwen/qwen3-coder`            |       ✅       | code generation / edits                   |
+| `thinking`       | `deepseek/deepseek-r1`        |       ✅       | step-by-step reasoning / planning         |
+| `ultra-thinking` | `anthropic/claude-opus-4`     |       —       | the hardest architecture / debugging work |
+| `research`       | `google/gemini-2.5-pro`       |       —       | long-context research / reading codebases |
+| `cheap`          | `deepseek/deepseek-chat`      |       ✅       | high-volume, low-stakes calls             |
+
 ### Defining roles
 
 Edit [`roles.yaml`](roles.yaml). Both shapes are supported:
 
 ```yaml
 roles:
-  fast: anthropic/claude-sonnet-4          # shorthand
+  coding: qwen/qwen3-coder                  # shorthand
   thinking:                                 # expanded
-    model: anthropic/claude-opus-4
-    description: Deep reasoning model
+    model: deepseek/deepseek-r1
+    description: Open-weight reasoning model
 ```
 
 Or override a single role without touching the file:
 
 ```bash
-MODEL_ROLE_THINKING=anthropic/claude-opus-4
-MODEL_ROLE_CHEAP=google/gemini-2.0-flash-001
+MODEL_ROLE_CODING=qwen/qwen3-coder
+MODEL_ROLE_RESEARCH=google/gemini-2.5-pro
+MODEL_ROLE_THINKING=deepseek/deepseek-r1
+MODEL_ROLE_ULTRA_THINKING=anthropic/claude-opus-4   # underscore -> ultra-thinking role
 ```
+
+> Shell environment variable names can't contain hyphens, so a role like
+> `ultra-thinking` is overridden with the underscore form
+> `MODEL_ROLE_ULTRA_THINKING` (it's aliased back to the hyphenated role name).
 
 > The default model IDs are sensible starting points. Browse
 > [openrouter.ai/models](https://openrouter.ai/models) and pick the exact
@@ -127,16 +144,20 @@ router and use the role names as model IDs. See the full walkthrough in
         "apiKey": "{env:ROUTER_API_KEY}"   // only needed if ROUTER_API_KEYS is set
       },
       "models": {
-        "thinking": { "name": "Thinking (router)" },
-        "fast":     { "name": "Fast (router)" },
-        "cheap":    { "name": "Cheap (router)" }
+        "fast":           { "name": "Fast (router)" },
+        "coding":         { "name": "Coding (router)" },
+        "thinking":       { "name": "Thinking (router)" },
+        "ultra-thinking": { "name": "Ultra-thinking (router)" },
+        "research":       { "name": "Research (router)" },
+        "cheap":          { "name": "Cheap (router)" }
       }
     }
   }
 }
 ```
 
-Then select `paperclip-router/thinking` (or `/fast`, `/cheap`) in OpenCode.
+Then select `paperclip-router/coding` (or `/thinking`, `/ultra-thinking`,
+`/research`, `/fast`, `/cheap`) in OpenCode.
 
 ## Development
 

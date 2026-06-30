@@ -41,6 +41,21 @@ def test_env_override_wins(tmp_path, monkeypatch):
     assert s.resolve("cheap") == "google/gemini-2.0-flash-001"
 
 
+def test_env_underscore_aliases_hyphen_role(tmp_path, monkeypatch):
+    roles = tmp_path / "roles.yaml"
+    roles.write_text("roles:\n  ultra-thinking: anthropic/claude-opus-4\n")
+    monkeypatch.setenv("ROLES_CONFIG_PATH", str(roles))
+    # Shell env can't express a hyphen; underscore form must map to it.
+    monkeypatch.setenv("MODEL_ROLE_ULTRA_THINKING", "deepseek/deepseek-r1")
+
+    s = load_settings()
+
+    assert s.resolve("ultra-thinking") == "deepseek/deepseek-r1"
+    # The underscore form must not leak as a second role.
+    assert "ultra_thinking" not in s.roles
+    assert s.is_role("ultra_thinking") is False
+
+
 def test_defaults_when_no_file(monkeypatch):
     monkeypatch.setenv("ROLES_CONFIG_PATH", "/nonexistent/roles.yaml")
     for k in list(os.environ):
@@ -49,9 +64,12 @@ def test_defaults_when_no_file(monkeypatch):
 
     s = load_settings()
 
-    assert "thinking" in s.roles
-    assert "fast" in s.roles
-    assert "cheap" in s.roles
+    for role in ("fast", "coding", "thinking", "ultra-thinking", "research", "cheap"):
+        assert role in s.roles, f"default role {role!r} missing"
+    # Open-source-forward defaults for the lanes the user asked to cover.
+    assert s.resolve("coding") == "qwen/qwen3-coder"
+    assert s.resolve("thinking") == "deepseek/deepseek-r1"
+    assert s.resolve("research") == "google/gemini-2.5-pro"
 
 
 def test_auth_disabled_when_no_keys(monkeypatch):

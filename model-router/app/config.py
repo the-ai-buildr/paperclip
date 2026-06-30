@@ -29,17 +29,26 @@ from pathlib import Path
 import yaml
 
 DEFAULT_ROLES: dict[str, str] = {
-    # Heavy reasoning / planning work.
-    "thinking": "anthropic/claude-opus-4",
-    # Day-to-day coding — strong but faster/cheaper than the thinking model.
+    # Day-to-day coding — balanced, low latency (the default role).
     "fast": "anthropic/claude-sonnet-4",
+    # Open-weight Qwen3 Coder for code generation / edits.
+    "coding": "qwen/qwen3-coder",
+    # Open-weight DeepSeek-R1 for step-by-step reasoning / planning.
+    "thinking": "deepseek/deepseek-r1",
+    # Top-tier reasoning for the hardest problems.
+    "ultra-thinking": "anthropic/claude-opus-4",
+    # Long-context research / synthesis.
+    "research": "google/gemini-2.5-pro",
     # High-volume, low-stakes calls (commit messages, classification, etc.).
     "cheap": "deepseek/deepseek-chat",
 }
 
 DEFAULT_ROLE_DESCRIPTIONS: dict[str, str] = {
-    "thinking": "Deep reasoning / planning model",
     "fast": "Balanced coding model for everyday work",
+    "coding": "Open-weight coding model (Qwen3 Coder)",
+    "thinking": "Open-weight reasoning model (DeepSeek-R1)",
+    "ultra-thinking": "Top-tier reasoning for the hardest work",
+    "research": "Long-context research / synthesis model",
     "cheap": "Low-cost model for high-volume, low-stakes calls",
 }
 
@@ -116,11 +125,18 @@ def load_settings() -> Settings:
     roles_path = Path(os.environ.get("ROLES_CONFIG_PATH", "roles.yaml"))
     roles, descriptions = _load_roles_file(roles_path)
 
-    # Per-role env overrides: MODEL_ROLE_THINKING=anthropic/claude-opus-4
+    # Per-role env overrides, e.g. MODEL_ROLE_CODING=qwen/qwen3-coder.
+    # Shell env names can't contain hyphens, so an underscore name overrides an
+    # existing hyphenated role: MODEL_ROLE_ULTRA_THINKING -> "ultra-thinking".
+    # We only rewrite to the hyphen form when that role already exists, so we
+    # don't leak a second "ultra_thinking" role into /v1/models and /healthz.
     for key, value in os.environ.items():
-        if key.startswith(_ENV_ROLE_PREFIX) and value.strip():
-            role_name = key[len(_ENV_ROLE_PREFIX) :].lower()
-            roles[role_name] = value.strip()
+        if not (key.startswith(_ENV_ROLE_PREFIX) and value.strip()):
+            continue
+        literal = key[len(_ENV_ROLE_PREFIX) :].lower()
+        hyphenated = literal.replace("_", "-")
+        target = hyphenated if (hyphenated != literal and hyphenated in roles) else literal
+        roles[target] = value.strip()
 
     api_keys = {
         k.strip()

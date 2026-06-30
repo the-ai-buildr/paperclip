@@ -74,7 +74,7 @@ def test_chat_completions_resolves_role(monkeypatch, mock_upstream):
     )
     assert r.status_code == 200
     # The role "thinking" was rewritten to the upstream model before forwarding.
-    assert captured["body"]["model"] == "anthropic/claude-opus-4"
+    assert captured["body"]["model"] == "deepseek/deepseek-r1"
     assert captured["auth"] == "Bearer sk-or-test"
     client.__exit__(None, None, None)
 
